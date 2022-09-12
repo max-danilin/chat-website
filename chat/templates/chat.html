@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+
+{% block css %}
+<style type="text/css">
+    /* Chat containers */
+    .container {
+      border: 2px solid #dedede;
+      background-color: #f1f1f1;
+      border-radius: 5px;
+      padding: 10px;
+      margin: 10px 0;
+    }
+
+    /* Darker chat container */
+    .darker {
+      border-color: #ccc;
+      background-color: #ddd;
+    }
+
+    /* Clear floats */
+    .container::after {
+      content: "";
+      clear: both;
+      display: table;
+    }
+
+    /* Style images */
+    .container b {
+      float: left;
+      max-width: 60px;
+      width: 100%;
+      margin-right: 20px;
+      border-radius: 50%;
+    }
+
+    /* Style the right image */
+    .container b.right {
+      float: right;
+      margin-left: 20px;
+      margin-right:0;
+    }
+
+    /* Style time text */
+    .time-right {
+      float: right;
+      color: #aaa;
+    }
+
+    /* Style time text */
+    .time-left {
+      float: left;
+      color: #999;
+    }
+
+</style>
+{% endblock css %}
+
+{% block title %}
+Chat
+{% endblock title %}
+
+{% block content %}
+    <h1>Chat App</h1>
+    {% if user.is_authenticated %}
+    <p>Hi, {{ user }}!</p>
+    {% endif %}
+    {% if chatroom %}
+    <p id="chatroom_gr">Welcome to chatroom {{ chatroom }}!</p>
+    {% endif %}
+    {% if username %}
+    <p id="friend_gr">Welcome to chat with {{ username }}!</p>
+    {% endif %}
+    <div class="container mt-5 w-50">
+        <div id="new" class="overflow-auto msgs" style="overflow-y: scroll; height:500px;" readonly>
+            
+        </div>
+        <div class="input-group mb-3">
+            <form id="chatForm" method="POST">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button class="btn btn-outline-secondary" type="submit" id="button-addon2">Send</button>
+            </form>
+        </div>
+        <a class="btn btn-primary" href="{% url 'logout' %}" role="button" id="logout-btn">Logout</a>
+        <a class="btn btn-primary" role="button" id="get_msg" style="display: none">Get msg</a>
+    </div>
+{% endblock content %}
+
+{% block javascript %}
+    {% comment %} For socket server debugging within webserver
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+    <script>
+        $("#get_msg").click(function () {
+            $.ajax({
+                  data: $(this).serialize(), // получаяем данные формы
+                  url: "{% url 'get_msg' %}",
+                  // если успешно, то
+                  success: function (response) {
+                    var catid;
+                    catid = response.messages;
+                    console.log( catid );
+                    var tag = document.createElement("p");
+                    var text = document.createTextNode(catid);
+                    tag.appendChild(text);
+                    var element = document.getElementById("new");
+                    element.appendChild(tag);
+                  },
+                  // если ошибка, то
+                  error: function (response) {
+                      // предупредим об ошибке
+                      console.log(response.responseJSON.errors)
+                  }
+              });
+        });
+    </script>
+    {% endcomment %}
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+    <script>
+        var name = '';
+        var flag = true;
+        function executeQuery() {
+            $.ajax({
+                data: $(this).serialize(), // получаяем данные формы
+                url: "{% url 'get_msg' %}",
+                // если успешно, то
+                success: function (response) {
+                    if (response.redirect !== false) {
+                        alert('Chat server unavailable.');
+                        window.location.replace(response.redirect);
+                    } else {
+                        var date = dateNow();
+                        for(var element of response.messages) {
+                            if (name !== element[0] && name !== '') {
+                                flag = !flag;
+                            }
+                            if (flag) {
+                                var content =
+                                    '<div class="container">' +
+                                    '<b style="color:#000" class="right">' +
+                                    element[0] +
+                                    "</b><p>" +
+                                    element[2] +
+                                    '</p><span class="time-right">' +
+                                    date + 
+                                    "</span></div>";
+                            }
+                            else {
+                                content =
+                                    '<div class="container darker">' +
+                                    '<b style="color:#000" class="left">' +
+                                    element[0] +
+                                    "</b><p>" +
+                                    element[2] +
+                                    '</p><span class="time-left">' +
+                                    date +
+                                    "</span></div>";
+                            }
+                            name = element[0];
+                            var messageDiv = document.getElementById("new");
+                            messageDiv.innerHTML += content;
+                        }
+                        if (scroll) {
+                            scrollSmoothToBottom("new");
+                        }
+                    }
+                },
+                // если ошибка, то
+                error: function (response) {
+                    // предупредим об ошибке
+                    console.log(response.responseJSON.errors);
+                }
+            });
+            setTimeout(executeQuery, 5000);
+        };
+        $("#get_msg").click(executeQuery);
+        function scrollSmoothToBottom(id) {
+            var div = document.getElementById(id);
+            $("#" + id).animate(
+                {
+                scrollTop: div.scrollHeight - div.clientHeight,
+                },
+                500
+            );
+        }
+        function dateNow() {
+            var date = new Date();
+            var aaaa = date.getFullYear();
+            var gg = date.getDate();
+            var mm = date.getMonth() + 1;
+        
+            if (gg < 10) gg = "0" + gg;
+        
+            if (mm < 10) mm = "0" + mm;
+        
+            var cur_day = aaaa + "-" + mm + "-" + gg;
+        
+            var hours = date.getHours();
+            var minutes = date.getMinutes();
+            var seconds = date.getSeconds();
+        
+            if (hours < 10) hours = "0" + hours;
+        
+            if (minutes < 10) minutes = "0" + minutes;
+        
+            if (seconds < 10) seconds = "0" + seconds;
+        
+            return cur_day + " " + hours + ":" + minutes;
+        }
+    </script>
+
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+    <script>
+        $("#logout-btn").click(function () {
+            document.getElementById('id_text').value = 'q';
+            $("#button-addon2").click();
+        });
+    </script>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            // отслеживаем событие отправки формы
+            $('#chatForm').submit(function () {
+                // создаем AJAX-вызов
+                $.ajax({
+                    data: $(this).serialize(), // получаем данные формы
+                    type: $(this).attr('method'), // GET или POST
+                    // если успешно, то
+                    success: function (response) {
+                        if (response.redirect !== false) {
+                            alert('Chat server unavailable.');
+                            window.location.replace(response.redirect);
+                        } else {
+                            console.log('[SUBMIT]');
+                        }
+                    },
+                    complete: function (response) {
+                        catid = document.getElementById('get_msg');
+                        console.log( catid );
+                        catid.click();
+                    },
+                    // если ошибка, то
+                    error: function (response) {
+                        // предупредим об ошибке
+                        alert(response.responseJSON.errors);
+                        console.log(response.responseJSON.errors);
+                    }
+                });
+                return false;
+            });
+        })
+    </script>
+{% endblock %}

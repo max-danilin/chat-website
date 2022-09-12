@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% block title %}
+Chatrooms
+{% endblock title %}
+
+{% block content %}
+    <h1>Chat App</h1>
+    {% if user.is_authenticated %}
+    <p>Hi, {{ user }}</p>
+    {% endif %}
+
+    <div class="container mt-5" style="float:left; height:300px; width:50%; position: absolute;">
+        <form id="chatroomForm" method="POST">
+            {% csrf_token %}
+            {{ form1 }}
+            <button class="btn btn-outline-secondary" type="submit" id="connect-chatroom" name="chat_btn">Connect</button>
+        </form>
+    </div>
+
+    <div class="container mt-5" style="float:right; height:300px; width:50%">
+        <form id="friendForm" method="POST">
+            {% csrf_token %}
+            {{ form2 }}
+            <button class="btn btn-outline-secondary" type="submit" id="connect-companion" name="friend_btn">Connect</button>
+        </form>
+    </div>
+    <div class="container" style="float:left;">
+        <a class="btn btn-primary" id="btn-chat-create">Create chatroom</a>
+        <a class="btn btn-primary" id="btn-chat-find">Find chatroom</a>
+        <a class="btn btn-primary" id="btn-user-find">Find user</a>
+    </div>
+    <div class="container" style="position: relative;float: left; top: 50px; display: none" id="chat_search_div">
+        <form method="POST" id="search_chat">
+            {% csrf_token %}
+            <input class="form-control" type="search" placeholder="Token" aria-label="Chatroom" id="chatroom_search" name="searched_chat">
+            <button class="btn btn-primary" type="submit">Search</button>
+        </form>
+    </div>
+    <div class="container" style="position: relative;float: left; top: 50px; display: none" id="user_search_div">
+        <form method="POST" id="search_user">
+            {% csrf_token %}
+            <input class="form-control" type="search" placeholder="Name" aria-label="Username" id="username_search" name="searched_user">
+            <button class="btn btn-primary" type="submit">Search</button>
+        </form>
+    </div>
+    <div class="container" style="position: relative;float: left; top: 50px; display: none" id="chat_create_div">
+        <form id="createChatForm" method="POST">
+            {% csrf_token %}
+            {{ form3.as_p }}
+            <button class="btn btn-primary" type="submit" name="create_btn">Create</button>
+        </form>
+    </div>
+    <div id="new" style="position: relative;float: left; top: 100px" class="container">
+
+    </div>
+
+{% endblock content %}
+
+{% block javascript %}
+    <script type="text/javascript">
+        document.getElementById("btn-chat-create").onclick = function () {
+            document.getElementById("chat_create_div").style.display = "block";
+            document.getElementById("user_search_div").style.display = "none";
+            document.getElementById("chat_search_div").style.display = "none";
+        }
+    </script>
+    <script type="text/javascript">
+        document.getElementById("btn-chat-find").onclick = function () {
+            document.getElementById("chat_create_div").style.display = "none";
+            document.getElementById("user_search_div").style.display = "none";
+            document.getElementById("chat_search_div").style.display = "block";
+        }
+    </script>
+    <script type="text/javascript">
+        document.getElementById("btn-user-find").onclick = function () {
+            document.getElementById("chat_create_div").style.display = "none";
+            document.getElementById("user_search_div").style.display = "block";
+            document.getElementById("chat_search_div").style.display = "none";
+        }
+    </script>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+<script>
+     $(document).ready(function () {
+        $("#search_chat").submit(function () {
+            $.ajax({
+                data: $(this).serialize(),
+                type: $(this).attr('method'), 
+                url: "{% url 'chatroom' %}",
+                // если успешно, то
+                success: function (response) {
+                    document.getElementById('new').innerHTML = '';
+                    if (response.chatroom) {
+                        var match_chat = document.createElement("p");
+                        match_chat.appendChild(document.createTextNode('Name: ' + response.chatroom));
+                        match_chat.appendChild(document.createElement("br"));
+                        match_chat.appendChild(document.createTextNode('Token: ' + response.token));
+                        match_chat.appendChild(document.createElement("br"));
+                        match_chat.appendChild(document.createTextNode('Private: ' + response.private));
+                        match_chat.appendChild(document.createElement("br"));
+                        match_chat.appendChild(document.createTextNode('Users: ' + response.users));
+
+                        let form_element = document.createElement('form');
+                        form_element.method = "POST";
+                        form_element.action = "{% url 'add_chat' %}";
+                        form_element.innerHTML = '{% csrf_token %}';
+                        let input_element = document.createElement('input');
+                        input_element.setAttribute("type", "hidden");
+                        input_element.setAttribute("value", response.token);
+                        input_element.setAttribute("name", "add_chatroom");
+                        let button_element = document.createElement('button');
+                        button_element.setAttribute("class", "btn btn-primary");
+                        button_element.setAttribute("type", "submit");
+                        button_element.appendChild(document.createTextNode('Add'));
+                        form_element.appendChild(input_element);
+                        form_element.appendChild(button_element);
+                        document.getElementById('new').appendChild(form_element);
+                    }
+                    else {
+                        var match_chat = document.createElement("p");
+                        match_chat.appendChild(document.createTextNode('No matching chatrooms found!'));
+                    }
+                    document.getElementById('new').prepend(match_chat);
+                },
+                complete: function (response) {
+                    console.log('Chat search completed.');
+                },
+                // если ошибка, то
+                error: function (response) {
+                    // предупредим об ошибке
+                    console.log(response.responseJSON.errors)
+                }
+            });
+            return false;
+        });
+    })
+</script>
+
+<script>
+    $(document).ready(function () {
+       $("#search_user").submit(function () {
+           $.ajax({
+               data: $(this).serialize(),
+               type: $(this).attr('method'), 
+               url: "{% url 'chatroom' %}",
+               // если успешно, то
+               success: function (response) {
+                    document.getElementById('new').innerHTML = '';
+                    if (response.username) {
+                        var match_chat = document.createElement("p");
+                        match_chat.appendChild(document.createTextNode('Name: ' + response.username));
+
+                        let form_element = document.createElement('form');
+                        form_element.method = "POST";
+                        form_element.action = "{% url 'add_user' %}";
+                        form_element.innerHTML = '{% csrf_token %}';
+                        let input_element = document.createElement('input');
+                        input_element.setAttribute("type", "hidden");
+                        input_element.setAttribute("value", response.username);
+                        input_element.setAttribute("name", "add_user");
+                        let button_element = document.createElement('button');
+                        button_element.setAttribute("class", "btn btn-primary");
+                        button_element.setAttribute("type", "submit");
+                        button_element.appendChild(document.createTextNode('Add'));
+                        form_element.appendChild(input_element);
+                        form_element.appendChild(button_element);
+                        document.getElementById('new').appendChild(form_element);
+                    }
+                    else {
+                        var match_chat = document.createElement("p");
+                        match_chat.appendChild(document.createTextNode('No users with such username found!'));
+                    }
+                    document.getElementById('new').prepend(match_chat);
+               },
+               complete: function (response) {
+                   console.log('User search completed');
+               },
+               // если ошибка, то
+               error: function (response) {
+                   // предупредим об ошибке
+                   console.log(response.responseJSON.errors)
+               }
+           });
+           return false;
+       });
+   })
+</script>
+{% endblock javascript %}

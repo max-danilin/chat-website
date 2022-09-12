@@ -1,0 +1,4 @@
+venv
+static
+migrations
+__pycache__

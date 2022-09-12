@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}
+Login to chat
+{% endblock title %}
+{% block content %}
+    {% if form.errors %}
+    <p>Some errors with your form...</p>
+    {% endif %}
+    <h1>Login</h1>
+    <form method='post'>
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn btn-primary" type="submit">Submit</button>
+        <a class="btn btn-primary" href="{% url 'register' %}" role="button">Register here</a>
+    </form>
+{% endblock content %}

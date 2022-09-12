@@ -1,0 +1,27 @@
+<div class="input-group">
+    <div id="new"></div>
+    {% comment %}      
+    <span class="input-group-text">Chat area</span>
+    <textarea class="form-control" aria-label="With textarea" rows='10' id="chat-field" readonly>Here is some text</textarea>
+    {% endcomment %} 
+</div>
+<div class="input-group mb-3">
+    <input type="text" class="form-control" placeholder="Type your message here" aria-label="Recipient's username" aria-describedby="button-addon2" id="input-msg">
+    <button class="btn btn-outline-secondary" type="button" id="button-addon2">Send</button>
+</div>
+
+data: $(this).serialize()
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+    <script type="text/javascript">
+        $("#button-addon2").click(function () {
+            var catid;
+            catid = document.getElementById('id_text').value;
+            console.log( catid );
+            var tag = document.createElement("p");
+            var text = document.createTextNode(catid);
+            tag.appendChild(text);
+            var element = document.getElementById("new");
+            element.appendChild(tag);
+        });
+    </script>
