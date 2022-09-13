@@ -70,6 +70,7 @@ Chat
     {% if username %}
     <p id="friend_gr">Welcome to chat with {{ username }}!</p>
     {% endif %}
+    <p>Active connections: <span id="active_mem">0</span>.</p>
     <div class="container mt-5 w-50">
         <div id="new" class="overflow-auto msgs" style="overflow-y: scroll; height:500px;" readonly>
             
@@ -129,6 +130,10 @@ Chat
                         alert('Chat server unavailable.');
                         window.location.replace(response.redirect);
                     } else {
+                        if (response.connected !== false) {
+                            var membersSpan = document.getElementById("active_mem");
+                            membersSpan.innerHTML = response.connected;
+                        }
                         var date = dateNow();
                         for(var element of response.messages) {
                             if (name !== element[0] && name !== '') {

@@ -23,6 +23,9 @@ class Chatroom:
         if self.token == other.token:
             return True
         return False
+    
+    def __str__(self) -> str:
+        return f'Chatroom with token {self.token} and {len(self.members)} members.'
 
 
 class Server:
@@ -30,7 +33,7 @@ class Server:
         self.bound = False
         self.messages = []
         self.clients = {}
-        self.chatrooms = []
+        self.chatrooms: Chatroom = []
         self.clients_addr = {}
         self.q = Queue()
 
@@ -58,11 +61,15 @@ class Server:
             self.chatrooms.append(chat)
         chat.members.append(name)
 
+        send_protocol(f'CONN::{len(chat.members)}', conn)
+        print(f'[ACTIBE CONNECTIONS AFTER CONNECT]: {len(self.clients_addr)}')
+        print(self.chatrooms)
+
         while connected:
             try:
                 msg = receive_protocol(conn)
                 print(f'[{name.upper()}]: {msg}')
-                self.broadcast(msg, name)
+                self.broadcast(msg, name, chat.token)
                 q.put((name, msg))
                 if msg == DISCONNECT_MESSAGE:
                     print('Disconnect message sent')
@@ -77,6 +84,13 @@ class Server:
         conn.close()
         del self.clients[addr]
         del self.clients_addr[addr]
+        self.delete_member_from_chatroom(name, chat)
+        self.delete_chatroom_if_empty(chat)
+
+
+        send_protocol(f'CONN::{len(chat.members)}', conn)
+        print(f'[ACTIBE CONNECTIONS AFTER DELETE]: {len(self.clients_addr)}')
+        print('DELETEd ', self.chatrooms)
 
     def start(self):
         if not self.bound:
@@ -88,10 +102,11 @@ class Server:
             thread = threading.Thread(target=self.handle_client, args=(conn, addr, self.q))
             thread.start()
             self.clients_addr[addr] = conn
-            print(f'[ACTIBE CONNECTIONS]: {len(self.clients)+1}')
+            print(f'[ACTIBE CONNECTIONS]: {len(self.clients_addr)}')
 
     def broadcast(self, msg, name='', chatroom=''):
         clients = self.get_client_sock_from_chat(chatroom)
+        print('FRM BRD ', clients, chatroom)
         for sock in clients:
             print('BROADCASTING')
             send_protocol(name+'::name::'+chatroom+'::chat::'+msg, sock)
@@ -106,21 +121,35 @@ class Server:
 
     def get_chatroom_by_token(self, token):
         match = [chat for chat in self.chatrooms if chat.token == token]
+        print('CHAT BY TOKEN ', token, match)
         return match[0] if match else None
 
     def get_client_sock_from_name(self, name):
         address = [addr for addr in list(self.clients.keys()) if self.clients[addr] == name][0]
+        print('NAME ADDR ', name, address)
         return self.clients_addr[address]
 
     def get_client_sock_from_chat(self, chatroom):
         chat = self.get_chatroom_by_token(chatroom)
+        print('GET SOCK ',chat)
         if not chat:
             return None
         conns = []
         for member in chat.members:
             conns.append(self.get_client_sock_from_name(member))
+        print('CONNS', conns)
         return conns
 
+    @staticmethod
+    def delete_member_from_chatroom(name, chat):
+        member = [memb for memb in chat.members if memb == name][0]
+        if member:
+            chat.members.remove(member)
+
+    def delete_chatroom_if_empty(self, chat):
+        if chat.members == []:
+            self.chatrooms.remove(chat)
+            del chat
 
 
 if __name__ == '__main__':

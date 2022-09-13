@@ -66,7 +66,7 @@ class Client:
             else:
                 print('Exception from connecting: ', exc)
         self.send(self.name)
-        self.send(self.chatroom)
+        self.send(str(self.chatroom))
         receiver = Thread(target=self.receive, args=(self.client,))
         receiver.start()
         # while True and client.fileno() != -1:
@@ -75,12 +75,17 @@ class Client:
         sep_sender = msg.find('::name::')
         if sep_sender == -1:
             sender = 'SERVER'
+            chat = None
+            conn_msg = msg.find('CONN::')
+            if conn_msg != -1:
+                active_members = msg[conn_msg+len('CONN::'):]
+                return (sender, 'conn', active_members)
         else:
             sender = msg[:sep_sender]
             msg = msg[sep_sender+len('::name::'):]
             sep_chat = msg.find('::chat::')
             chat = msg[:sep_chat]
-            msg = msg[sep_chat+len('::chat::')]
+            msg = msg[sep_chat+len('::chat::'):]
         return (sender, chat, msg)
 
     @property

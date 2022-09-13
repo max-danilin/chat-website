@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.urls import reverse
 
-from chat_django import chat
+# from chat_django import chat
 from .forms import ChatroomCreateForm, CompanionForm, UserRegistrationForm, UserAuthentificationForm, MessageForm, ChatroomForm
 from .models import Message, Chatroom, Companion
 from .client import Client, DISCONNECT_MESSAGE, SocketException
@@ -82,7 +82,7 @@ def choose_chatroom(request):
         if chat_query:
             try:
                 chat_uuid = uuid.UUID(chat_query)
-                match = Chatroom.objects.filter(token=chat_uuid).first()
+                match = Chatroom.objects.filter(token=chat_uuid).filter(private=False).first()
                 response = {'chatroom': match.name, 'private': match.private, 'token': match.token, 'users': match.companions.count()}
             except ValueError as exc:
                 print(exc)
@@ -118,7 +118,7 @@ def choose_chatroom(request):
             companion2 = Companion.objects.get(user__username=friend_name)
             companion2.chatroom.add(chat_private)
             print('FRIEND')
-            return redirect('chat_friend', username=friend_name)
+            return redirect('chat_chatroom', chatroom=chat_private.token)
     else:
         form_create_chatroom = ChatroomCreateForm()
     return render(request, 'chatroom.html', {'form1': form_chatroom, 'form2': form_companion, 'form3': form_create_chatroom})
@@ -137,18 +137,23 @@ def get_client(request, chatroom=None):
         client = [cl for cl in clients if cl.name == request.user.username][0]
     return client
 
-def send_friend(request, username):
-    request, form = send_message(request, username)
-    print('Username ', username)
-    if form == 'is_ajax':
-        return request
-    elif form == 'con_err':
-        return redirect('hello')
-    return render(request, 'chat.html', {'form': form, 'username': username})
+# def send_friend(request, username):
+#     request, form = send_message(request, username)
+#     print('Username ', username)
+#     if form == 'is_ajax':
+#         return request
+#     elif form == 'con_err':
+#         return redirect('hello')
+#     return render(request, 'chat.html', {'form': form, 'username': username})
 
 def send_chatroom(request, chatroom):
     new_request, form = send_message(request, chatroom)
     chatroom_obj = Chatroom.objects.get(token=chatroom)
+    if chatroom_obj.private:
+        companion = [user.user.username for user in chatroom_obj.companions.all() if user.user.username != request.user.username][0]
+        data = {'form': form, 'username': companion}
+    else:
+        data = {'form': form, 'chatroom': chatroom_obj.name}
     print('Chatroom ', chatroom)
     if form == 'is_ajax':
         print('AJAX')
@@ -156,7 +161,7 @@ def send_chatroom(request, chatroom):
     elif form == 'con_err':
         print('CONN ERR')
         return new_request
-    return render(new_request, 'chat.html', {'form': form, 'chatroom': chatroom_obj.name})
+    return render(new_request, 'chat.html', data)
 
 def send_message(request, destination):
     global clients
@@ -238,10 +243,16 @@ def get_msg(request):
         return redirect("login")
     try:
         client = get_client(request)
-        response = {'messages': client.get_messages, 'redirect': False}
+        messages = client.get_messages
+        active_members = False
+        for msg in messages:
+            if msg[1] == 'conn':
+                active_members = int(msg[2])
+                messages.remove(msg)
+        response = {'messages': messages, 'connected': active_members, 'redirect': False}
     except SocketException:
         print('EXCEPTION FROM GET')
-        response = {'messages': None, 'redirect': reverse('hello')}
+        response = {'messages': None, 'connected': False, 'redirect': reverse('hello')}
     print(response)
     return JsonResponse(response, safe=False)
 
