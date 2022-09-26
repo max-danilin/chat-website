@@ -59,7 +59,7 @@ class CompanionForm(forms.Form):
         self.request = kwargs.pop('request')
         super().__init__(*args, **kwargs)
         self.user = self.request.user
-        avail_comp = [ch for ch in Companion.objects.filter(friend__user=self.user).all()]
+        avail_comp = [ch for ch in Companion.objects.filter(friend__user=self.user)]
         self.fields['name'].choices = list(zip([ch.user.username for ch in avail_comp], [ch.user.username for ch in avail_comp]))
         self.fields['name'].label = 'Friends'
 

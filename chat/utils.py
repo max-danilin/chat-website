@@ -5,7 +5,7 @@ DISCONNECT_MESSAGE = '!disconnect'
 
 def receive_protocol(conn):
     msg_length = conn.recv(HEADER).decode(FORMAT)
-    # print('[Receiving length]:', msg_length, type(msg_length))
+    print('[Receiving length]:', msg_length, type(msg_length))
     if msg_length:
         msg_length = int(msg_length)
         msg = conn.recv(msg_length).decode(FORMAT)

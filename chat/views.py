@@ -1,16 +1,21 @@
 from multiprocessing.sharedctypes import Value
+from typing import Dict
 import uuid
+from django.db.models import Q
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout
 from django.http import JsonResponse
 from django.contrib import messages
 from django.contrib.auth.models import User
-from django.urls import reverse
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic.edit import FormView
+from django.urls import reverse, reverse_lazy
 
 # from chat_django import chat
 from .forms import ChatroomCreateForm, CompanionForm, UserRegistrationForm, UserAuthentificationForm, MessageForm, ChatroomForm
 from .models import Message, Chatroom, Companion
 from .client import Client, DISCONNECT_MESSAGE, SocketException
+from .mixins import MyCustomForm, MultipleFormView
 
 # Create your views here.
 
@@ -71,57 +76,131 @@ def validate_username(request):
     }
     return JsonResponse(response)
 
-def choose_chatroom(request):
-    if not isinstance(request.user, User):
-        return redirect("login")
-    form_chatroom = ChatroomForm(request=request)
-    form_companion = CompanionForm(request=request)
-    if request.method == 'POST' and is_ajax(request):
-        chat_query = request.POST.get('searched_chat')
-        user_query = request.POST.get('searched_user')
-        if chat_query:
-            try:
-                chat_uuid = uuid.UUID(chat_query)
-                match = Chatroom.objects.filter(token=chat_uuid).filter(private=False).first()
-                response = {'chatroom': match.name, 'private': match.private, 'token': match.token, 'users': match.companions.count()}
-            except ValueError as exc:
-                print(exc)
-                response = {'chatroom': None}
-        elif user_query:
-            match = User.objects.filter(username=user_query).first()
-            if match:
-                response = {'username': match.username}
-            else:
-                response = {'username': None}
-        print(response)
-        return JsonResponse(response)
-    elif request.method == 'POST':
-        print(list(request.POST.items()))
-        if 'create_btn' in request.POST:
-            form_create_chatroom = ChatroomCreateForm(data=request.POST)
-            if form_create_chatroom.is_valid():
-                chat = form_create_chatroom.save()
-                companion = Companion.objects.get(user=request.user)
-                companion.chatroom.add(chat)
-                return redirect('chatroom')
-            else:
-                messages.error(request, 'Inputs for creating chatroom are incorrect!')
-        elif 'chat_btn' in request.POST:
+
+class ChooseChatroomView(LoginRequiredMixin, MultipleFormView):
+    template_name: str = 'chatroom.html'
+    form_classes = [MyCustomForm(name=ChatroomForm, trigger='chat_btn', add_request=True),
+                    MyCustomForm(name=CompanionForm, trigger='friend_btn', add_request=True),
+                    MyCustomForm(name=ChatroomCreateForm, trigger='create_btn', add_request=False, to_save=True)]
+    success_urls = {ChatroomForm: 'chat_chatroom',
+                    CompanionForm: 'chat_chatroom',
+                    ChatroomCreateForm: 'chatroom'}
+    login_url = reverse_lazy('login')
+
+    def perform_additional_action(self, request, form):
+        print(form, type(form))
+        if issubclass(form, ChatroomCreateForm):
+            companion = Companion.objects.get(user=request.user)
+            companion.chatroom.add(form)
+            return {}
+        elif issubclass(form, ChatroomForm):
             chatroom_name = request.POST.get('name')
-            print('CHAT')
-            return redirect('chat_chatroom', chatroom=chatroom_name)
-        elif 'friend_btn' in request.POST:
+            return {'chatroom': chatroom_name}
+        elif issubclass(form, CompanionForm):
             friend_name = request.POST.get('name')
             chat_private = Chatroom.objects.create(name=request.user.username+'-'+friend_name, private=True)
-            companion1 = Companion.objects.get(user=request.user)
-            companion1.chatroom.add(chat_private)
-            companion2 = Companion.objects.get(user__username=friend_name)
-            companion2.chatroom.add(chat_private)
-            print('FRIEND')
-            return redirect('chat_chatroom', chatroom=chat_private.token)
-    else:
-        form_create_chatroom = ChatroomCreateForm()
-    return render(request, 'chatroom.html', {'form1': form_chatroom, 'form2': form_companion, 'form3': form_create_chatroom})
+            # companion1 = Companion.objects.get(user=request.user)
+            companions = Companion.objects.filter(Q(user__username=friend_name) | Q(user=request.user))
+            for companion in companions:
+                companion.chatroom.add(chat_private)
+            # companion1.chatroom.add(chat_private)
+            # companion2 = Companion.objects.get(user__username=friend_name)
+            # companion2.chatroom.add(chat_private)
+            return {'chatroom': chat_private.token}
+    
+    def do_ajax_stuff(self, request, method, triggers=...):
+        return super().do_ajax_stuff(request, method, triggers=['searched_chat', 'searched_user'])
+
+    def query_searched_user(self, query):
+        match = User.objects.filter(username=query).first()
+        return {'username': match.username} if match else {'username': None}
+
+    def query_searched_chat(self, query):
+        try:
+            chat_uuid = uuid.UUID(query)
+            match = Chatroom.objects.filter(token=chat_uuid).filter(private=False).first()
+            response = {'chatroom': match.name, 'private': match.private, 'token': match.token, 'users': match.companions.count()} if match else {'chatroom': None}
+        except ValueError as exc:
+            print(exc)
+            response = {'chatroom': None}
+        return response
+
+    # def do_ajax_stuff(self, request):
+    #     chat_query = request.POST.get('searched_chat')
+    #     user_query = request.POST.get('searched_user')
+    #     if chat_query:
+    #         try:
+    #             chat_uuid = uuid.UUID(chat_query)
+    #             match = Chatroom.objects.filter(token=chat_uuid).filter(private=False).first()
+    #             response = {'chatroom': match.name, 'private': match.private, 'token': match.token, 'users': match.companions.count()}
+    #         except ValueError as exc:
+    #             print(exc)
+    #             response = {'chatroom': None}
+    #     elif user_query:
+    #         match = User.objects.filter(username=user_query).first()
+    #         if match:
+    #             response = {'username': match.username}
+    #         else:
+    #             response = {'username': None}
+    #     return response
+
+
+# def choose_chatroom(request):
+#     if not isinstance(request.user, User):
+#         return redirect("login")
+#     form_chatroom = ChatroomForm(request=request)
+#     form_companion = CompanionForm(request=request)
+#     if request.method == 'POST' and is_ajax(request):
+#         chat_query = request.POST.get('searched_chat')
+#         user_query = request.POST.get('searched_user')
+#         if chat_query:
+#             try:
+#                 chat_uuid = uuid.UUID(chat_query)
+#                 match = Chatroom.objects.filter(token=chat_uuid).filter(private=False).first()
+#                 response = {'chatroom': match.name, 'private': match.private, 'token': match.token, 'users': match.companions.count()}
+#             except ValueError as exc:
+#                 print(exc)
+#                 response = {'chatroom': None}
+#         elif user_query:
+#             match = User.objects.filter(username=user_query).first()
+#             if match:
+#                 response = {'username': match.username}
+#             else:
+#                 response = {'username': None}
+#         print(response)
+#         return JsonResponse(response)
+#     elif request.method == 'POST':
+#         print('EVERYTHING IN POST', list(request.POST.items()))
+#         print(form_chatroom.__dict__)
+#         # print(form_companion.__dict__)
+#         if request.POST.get('create_btn', None) is not None:
+#             form_create_chatroom = ChatroomCreateForm(data=request.POST)
+#             if form_create_chatroom.is_valid():
+#                 chat = form_create_chatroom.save()
+#                 companion = Companion.objects.get(user=request.user)
+#                 companion.chatroom.add(chat)
+#                 return redirect('chatroom')
+#             else:
+#                 messages.error(request, 'Inputs for creating chatroom are incorrect!')
+#         elif request.POST.get('chat_btn', None) is not None:
+#             chatroom_name = request.POST.get('name')
+#             form_chatroom = ChatroomForm(request=request, data=request.POST)
+#             print('CHAT')
+#             if form_chatroom.is_valid():
+#                 print(form_chatroom.data.get('name'))
+#             return redirect('chat_chatroom', chatroom=chatroom_name)
+#         elif 'friend_btn' in request.POST:
+#             friend_name = request.POST.get('name')
+#             chat_private = Chatroom.objects.create(name=request.user.username+'-'+friend_name, private=True)
+#             companion1 = Companion.objects.get(user=request.user)
+#             companion1.chatroom.add(chat_private)
+#             companion2 = Companion.objects.get(user__username=friend_name)
+#             companion2.chatroom.add(chat_private)
+#             print('FRIEND')
+#             return redirect('chat_chatroom', chatroom=chat_private.token)
+#     else:
+#         form_create_chatroom = ChatroomCreateForm()
+#     return render(request, 'chatroom.html', {'form1': form_chatroom, 'form2': form_companion, 'form3': form_create_chatroom})
 
 def get_client(request, chatroom=None):
     global clients
@@ -145,6 +224,23 @@ def get_client(request, chatroom=None):
 #     elif form == 'con_err':
 #         return redirect('hello')
 #     return render(request, 'chat.html', {'form': form, 'username': username})
+
+class ChatView(LoginRequiredMixin, FormView):
+    template_name = 'chat.html'
+    login_url = reverse_lazy('login')
+    form_class = MessageForm
+
+    def get(self, request, destination, *args, **kwargs):
+        try:
+            client = get_client(request, destination)
+        except SocketException:
+            print('EXCEPTION FROM SEND')
+            return redirect('hello'), 'con_err'
+        return super().get(request, *args, **kwargs)
+
+    def form_valid(self, form: _FormT) -> HttpResponse:
+        return super().form_valid(form)
+
 
 def send_chatroom(request, chatroom):
     new_request, form = send_message(request, chatroom)

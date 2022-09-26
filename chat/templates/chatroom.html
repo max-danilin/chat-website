@@ -12,7 +12,7 @@ Chatrooms
     <div class="container mt-5" style="float:left; height:300px; width:50%; position: absolute;">
         <form id="chatroomForm" method="POST">
             {% csrf_token %}
-            {{ form1 }}
+            {{ form_ChatroomForm }}
             <button class="btn btn-outline-secondary" type="submit" id="connect-chatroom" name="chat_btn">Connect</button>
         </form>
     </div>
@@ -20,7 +20,7 @@ Chatrooms
     <div class="container mt-5" style="float:right; height:300px; width:50%">
         <form id="friendForm" method="POST">
             {% csrf_token %}
-            {{ form2 }}
+            {{ form_CompanionForm }}
             <button class="btn btn-outline-secondary" type="submit" id="connect-companion" name="friend_btn">Connect</button>
         </form>
     </div>
@@ -46,7 +46,7 @@ Chatrooms
     <div class="container" style="position: relative;float: left; top: 50px; display: none" id="chat_create_div">
         <form id="createChatForm" method="POST">
             {% csrf_token %}
-            {{ form3.as_p }}
+            {{ form_ChatroomCreateForm.as_p }}
             <button class="btn btn-primary" type="submit" name="create_btn">Create</button>
         </form>
     </div>
